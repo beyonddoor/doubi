@@ -63,10 +63,10 @@ check_sys(){
 	elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
 		release="centos"
     fi
-	bit=`uname -m`
+	bit=$(uname -m)
 }
 check_pid(){
-	PID=`ps -ef |grep -v grep | grep server.py |awk '{print $2}'`
+	PID=$(ps -ef |grep -v grep | grep server.py |awk '{print $2}')
 }
 check_crontab(){
 	[[ ! -e "/usr/bin/crontab" ]] && echo -e "${Error} 缺少依赖 Crontab ，请尝试手动安装 CentOS: yum install crond -y , Debian/Ubuntu: apt-get install cron -y !" && exit 1
