@@ -10,6 +10,10 @@ export PATH
 #	Blog: https://doub.io/ss-jc60/
 #=================================================
 
+# 外部依赖的文件
+# /usr/local/shadowsocksr/mujson_mgr.py 依赖于这个脚本进行管理
+# 
+
 sh_ver="1.0.26"
 filepath=$(cd "$(dirname "$0")"; pwd)
 file=$(echo -e "${filepath}"|awk -F "$0" '{print $1}')
@@ -21,12 +25,20 @@ config_user_mudb_file="${ssr_folder}/mudb.json"
 ssr_log_file="${ssr_folder}/ssserver.log"
 Libsodiumr_file="/usr/local/lib/libsodium.so"
 Libsodiumr_ver_backup="1.0.15"
+# TODO 什么用途
 Server_Speeder_file="/serverspeeder/bin/serverSpeeder.sh"
 LotServer_file="/appex/bin/serverSpeeder.sh"
+# TODO 什么用途
 BBR_file="${file}/bbr.sh"
+# TODO 什么用途
 jq_file="${ssr_folder}/jq"
 
-Green_font_prefix="\033[32m" && Red_font_prefix="\033[31m" && Green_background_prefix="\033[42;37m" && Red_background_prefix="\033[41;37m" && Font_color_suffix="\033[0m"
+Green_font_prefix="\033[32m"
+Red_font_prefix="\033[31m"
+Green_background_prefix="\033[42;37m"
+Red_background_prefix="\033[41;37m"
+Font_color_suffix="\033[0m"
+
 Info="${Green_font_prefix}[信息]${Font_color_suffix}"
 Error="${Red_font_prefix}[错误]${Font_color_suffix}"
 Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
@@ -119,7 +131,8 @@ Set_iptables(){
 		chmod +x /etc/network/if-pre-up.d/iptables
 	fi
 }
-# 读取 配置信息
+
+# 获取ip地址
 Get_IP(){
 	ip=$(wget -qO- -t1 -T2 ipinfo.io/ip)
 	if [[ -z "${ip}" ]]; then
@@ -132,8 +145,11 @@ Get_IP(){
 		fi
 	fi
 }
+
+# 获取用户信息，提取的信息保存在全局参数中
 Get_User_info(){
 	Get_user_port=$1
+	local user_info_get
 	user_info_get=$(python mujson_mgr.py -l -p "${Get_user_port}")
 	match_info=$(echo "${user_info_get}"|grep -w "### user ")
 	if [[ -z "${match_info}" ]]; then
@@ -156,6 +172,8 @@ Get_User_info(){
 	speed_limit_per_user=$(echo "${user_info_get}"|grep -w "speed_limit_per_user :"|sed 's/[[:space:]]//g'|awk -F ":" '{print $NF}')
 	Get_User_transfer "${port}"
 }
+
+# 获取用户流量
 Get_User_transfer(){
 	transfer_port=$1
 	#echo "transfer_port=${transfer_port}"
@@ -274,10 +292,13 @@ Get_User_transfer_all(){
 		transfer_enable_Used_233_2="${transfer_enable_Used_233_2} TB"
 	fi
 }
+# base64编码
 urlsafe_base64(){
+	local date
 	date=$(echo -n "$1"|base64|sed ':a;N;s/\n/ /g;ta'|sed 's/ //g;s/=//g;s/+/-/g;s/\//_/g')
 	echo -e "${date}"
 }
+# 生成qr二维码（注意：doub服务不可用了）
 ss_link_qr(){
 	SSbase64=$(urlsafe_base64 "${method}:${password}@${ip}:${port}")
 	SSurl="ss://${SSbase64}"
@@ -384,7 +405,7 @@ Set_config_port(){
 	echo -e "请输入要设置的用户 端口(请勿重复, 用于区分)"
 	read -e -p "(默认: 2333):" ssr_port
 	[[ -z "$ssr_port" ]] && ssr_port="2333"
-	echo $((${ssr_port}+0)) &>/dev/null
+	echo $((ssr_port+0)) &>/dev/null
 	if [[ $? == 0 ]]; then
 		if [[ ${ssr_port} -ge 1 ]] && [[ ${ssr_port} -le 65535 ]]; then
 			echo && echo ${Separator_1} && echo -e "	端口 : ${Green_font_prefix}${ssr_port}${Font_color_suffix}" && echo ${Separator_1} && echo
@@ -397,15 +418,17 @@ Set_config_port(){
 	fi
 	done
 }
+# 提取password输入
 Set_config_password(){
 	echo "请输入要设置的用户 密码"
 	read -e -p "(默认: doub.io):" ssr_password
 	[[ -z "${ssr_password}" ]] && ssr_password="doub.io"
 	echo && echo ${Separator_1} && echo -e "	密码 : ${Green_font_prefix}${ssr_password}${Font_color_suffix}" && echo ${Separator_1} && echo
 }
+# 提取method输入
 Set_config_method(){
 	echo -e "请选择要设置的用户 加密方式
-	
+
  ${Green_font_prefix} 1.${Font_color_suffix} none
  ${Tip} 如果使用 auth_chain_* 系列协议，建议加密方式选择 none (该系列协议自带 RC4 加密)，混淆随意
  
@@ -468,6 +491,7 @@ Set_config_method(){
 	fi
 	echo && echo ${Separator_1} && echo -e "	加密 : ${Green_font_prefix}${ssr_method}${Font_color_suffix}" && echo ${Separator_1} && echo
 }
+# 提取protocol输入
 Set_config_protocol(){
 	echo -e "请选择要设置的用户 协议插件
 	
@@ -821,8 +845,9 @@ Modify_config_all(){
 	Modify_config_transfer
 	Modify_config_forbid
 }
+# 安装python
 Check_python(){
-	python_ver=`python -h`
+	python_ver=$(python -h)
 	if [[ -z ${python_ver} ]]; then
 		echo -e "${Info} 没有安装Python，开始安装..."
 		if [[ ${release} == "centos" ]]; then
@@ -832,6 +857,7 @@ Check_python(){
 		fi
 	fi
 }
+# 安装工具
 Centos_yum(){
 	yum update
 	cat /etc/redhat-release |grep 7\..*|grep -i centos>/dev/null
@@ -841,6 +867,7 @@ Centos_yum(){
 		yum install -y vim unzip crond
 	fi
 }
+# 安装工具
 Debian_apt(){
 	apt-get update
 	cat /etc/issue |grep 9\..*>/dev/null
@@ -850,7 +877,7 @@ Debian_apt(){
 		apt-get install -y vim unzip cron
 	fi
 }
-# 下载 ShadowsocksR
+# 下载 ShadowsocksR并配置
 Download_SSR(){
 	cd "/usr/local"
 	wget -N --no-check-certificate "https://github.com/ToyoDAdoubiBackup/shadowsocksr/archive/manyuser.zip"
@@ -875,6 +902,7 @@ Download_SSR(){
 	sed -i 's/ \/\/ only works under multi-user mode//g' "${config_user_file}"
 	echo -e "${Info} ShadowsocksR服务端 下载完成 !"
 }
+# 下载管理脚本（开机启动？）
 Service_SSR(){
 	if [[ ${release} = "centos" ]]; then
 		if ! wget --no-check-certificate https://raw.githubusercontent.com/ToyoDAdoubi/doubi/master/service/ssrmu_centos -O /etc/init.d/ssrmu; then
@@ -893,6 +921,7 @@ Service_SSR(){
 	echo -e "${Info} ShadowsocksR服务 管理脚本下载完成 !"
 }
 # 安装 JQ解析器
+# TODO 做什么用？
 JQ_install(){
 	if [[ ! -e ${jq_file} ]]; then
 		cd "${ssr_folder}"
@@ -928,6 +957,7 @@ Installation_dependency(){
 		/etc/init.d/cron restart
 	fi
 }
+# 完整的安装流程
 Install_SSR(){
 	check_root
 	[[ -e ${ssr_folder} ]] && echo -e "${Error} ShadowsocksR 文件夹已存在，请检查( 如安装失败或者存在旧版本，请先卸载 ) !" && exit 1
@@ -955,6 +985,7 @@ Install_SSR(){
 	Get_User_info "${ssr_port}"
 	View_User_info
 }
+# 更新
 Update_SSR(){
 	SSR_installation_status
 	echo -e "因破娃暂停更新ShadowsocksR服务端，所以此功能临时禁用。"
@@ -962,6 +993,7 @@ Update_SSR(){
 	#git pull
 	#Restart_SSR
 }
+# 卸载
 Uninstall_SSR(){
 	[[ ! -e ${ssr_folder} ]] && echo -e "${Error} 没有安装 ShadowsocksR，请检查 !" && exit 1
 	echo "确定要 卸载ShadowsocksR？[y/N]" && echo
@@ -1001,6 +1033,7 @@ Check_Libsodium_ver(){
 	[[ -z ${Libsodiumr_ver} ]] && Libsodiumr_ver=${Libsodiumr_ver_backup}
 	echo -e "${Info} libsodium 最新版本为 ${Green_font_prefix}${Libsodiumr_ver}${Font_color_suffix} !"
 }
+# TODO 做什么用
 Install_Libsodium(){
 	if [[ -e ${Libsodiumr_file} ]]; then
 		echo -e "${Error} libsodium 已安装 , 是否覆盖安装(更新)？[y/N]"
@@ -1046,20 +1079,20 @@ debian_View_user_connection_info(){
 	user_info=$(python mujson_mgr.py -l)
 	user_total=$(echo "${user_info}"|wc -l)
 	[[ -z ${user_info} ]] && echo -e "${Error} 没有发现 用户，请检查 !" && exit 1
-	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l`
+	IP_total=$(netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l)
 	user_list_all=""
-	for((integer = 1; integer <= ${user_total}; integer++))
+	for((integer = 1; integer <= user_total; integer++))
 	do
 		user_port=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $4}')
-		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |grep ":${user_port} " |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
+		user_IP_1=$(netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp6' |grep ":${user_port} " |awk '{print $5}' |awk -F ":" '{print $1}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}")
 		if [[ -z ${user_IP_1} ]]; then
 			user_IP_total="0"
 		else
-			user_IP_total=`echo -e "${user_IP_1}"|wc -l`
+			user_IP_total=$(echo -e "${user_IP_1}"|wc -l)
 			if [[ ${format_1} == "IP_address" ]]; then
 				get_IP_address
 			else
-				user_IP=`echo -e "\n${user_IP_1}"`
+				user_IP=$(echo -e "\n${user_IP_1}")
 			fi
 		fi
 		user_info_233=$(python mujson_mgr.py -l|grep -w "${user_port}"|awk '{print $2}'|sed 's/\[//g;s/\]//g')
@@ -1069,25 +1102,26 @@ debian_View_user_connection_info(){
 	echo -e "用户总数: ${Green_background_prefix} "${user_total}" ${Font_color_suffix} 链接IP总数: ${Green_background_prefix} "${IP_total}" ${Font_color_suffix} "
 	echo -e "${user_list_all}"
 }
+# 显示当前连接的user
 centos_View_user_connection_info(){
 	format_1=$1
 	user_info=$(python mujson_mgr.py -l)
 	user_total=$(echo "${user_info}"|wc -l)
 	[[ -z ${user_info} ]] && echo -e "${Error} 没有发现 用户，请检查 !" && exit 1
-	IP_total=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' | grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l`
+	IP_total=$(netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' | grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}" |wc -l)
 	user_list_all=""
-	for((integer = 1; integer <= ${user_total}; integer++))
+	for((integer = 1; integer <= user_total; integer++))
 	do
 		user_port=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $4}')
-		user_IP_1=`netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' |grep ":${user_port} "|grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"`
+		user_IP_1=$(netstat -anp |grep 'ESTABLISHED' |grep 'python' |grep 'tcp' |grep ":${user_port} "|grep '::ffff:' |awk '{print $5}' |awk -F ":" '{print $4}' |sort -u |grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}")
 		if [[ -z ${user_IP_1} ]]; then
 			user_IP_total="0"
 		else
-			user_IP_total=`echo -e "${user_IP_1}"|wc -l`
+			user_IP_total=$(echo -e "${user_IP_1}"|wc -l)
 			if [[ ${format_1} == "IP_address" ]]; then
 				get_IP_address
 			else
-				user_IP=`echo -e "\n${user_IP_1}"`
+				user_IP=$(echo -e "\n${user_IP_1}")
 			fi
 		fi
 		user_info_233=$(python mujson_mgr.py -l|grep -w "${user_port}"|awk '{print $2}'|sed 's/\[//g;s/\]//g')
@@ -1130,11 +1164,11 @@ get_IP_address(){
 	#echo "user_IP_1=${user_IP_1}"
 	if [[ ! -z ${user_IP_1} ]]; then
 	#echo "user_IP_total=${user_IP_total}"
-		for((integer_1 = ${user_IP_total}; integer_1 >= 1; integer_1--))
+		for((integer_1 = user_IP_total; integer_1 >= 1; integer_1--))
 		do
-			IP=`echo "${user_IP_1}" |sed -n "$integer_1"p`
+			IP=$(echo "${user_IP_1}" |sed -n "$integer_1"p)
 			#echo "IP=${IP}"
-			IP_address=`wget -qO- -t1 -T2 http://freeapi.ipip.net/${IP}|sed 's/\"//g;s/,//g;s/\[//g;s/\]//g'`
+			IP_address=$(wget -qO- -t1 -T2 http://freeapi.ipip.net/${IP}|sed 's/\"//g;s/,//g;s/\[//g;s/\]//g')
 			#echo "IP_address=${IP_address}"
 			user_IP="${user_IP}\n${IP}(${IP_address})"
 			#echo "user_IP=${user_IP}"
@@ -1151,7 +1185,7 @@ Modify_port(){
 		read -e -p "(默认: 取消):" ssr_port
 		[[ -z "${ssr_port}" ]] && echo -e "已取消..." && exit 1
 		Modify_user=$(cat "${config_user_mudb_file}"|grep '"port": '"${ssr_port}"',')
-		if [[ ! -z ${Modify_user} ]]; then
+		if [[ -n ${Modify_user} ]]; then
 			break
 		else
 			echo -e "${Error} 请输入正确的端口 !"
@@ -1236,12 +1270,12 @@ List_port_user(){
 	user_total=$(echo "${user_info}"|wc -l)
 	[[ -z ${user_info} ]] && echo -e "${Error} 没有发现 用户，请检查 !" && exit 1
 	user_list_all=""
-	for((integer = 1; integer <= ${user_total}; integer++))
+	for((integer = 1; integer <= user_total; integer++))
 	do
 		user_port=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $4}')
 		user_username=$(echo "${user_info}"|sed -n "${integer}p"|awk '{print $2}'|sed 's/\[//g;s/\]//g')
 		Get_User_transfer "${user_port}"
-		transfer_enable_Used_233=$(echo $((${transfer_enable_Used_233}+${transfer_enable_Used_2_1})))
+		transfer_enable_Used_233=$((transfer_enable_Used_233+transfer_enable_Used_2_1))
 		user_list_all=${user_list_all}"用户名: ${Green_font_prefix} "${user_username}"${Font_color_suffix}\t 端口: ${Green_font_prefix}"${user_port}"${Font_color_suffix}\t 流量使用情况(已用+剩余=总): ${Green_font_prefix}${transfer_enable_Used_2}${Font_color_suffix} + ${Green_font_prefix}${transfer_enable_Used}${Font_color_suffix} = ${Green_font_prefix}${transfer_enable}${Font_color_suffix}\n"
 	done
 	Get_User_transfer_all
@@ -1500,8 +1534,8 @@ Install_ServerSpeeder(){
 	[[ ! -e "/tmp/serverspeeder.sh" ]] && echo -e "${Error} 锐速安装脚本下载失败 !" && exit 1
 	bash /tmp/serverspeeder.sh
 	sleep 2s
-	PID=`ps -ef |grep -v grep |grep "serverspeeder" |awk '{print $2}'`
-	if [[ ! -z ${PID} ]]; then
+	PID=$(ps -ef |grep -v grep |grep "serverspeeder" |awk '{print $2}')
+	if [[ -n ${PID} ]]; then
 		rm -rf /tmp/serverspeeder.sh
 		rm -rf /tmp/91yunserverspeeder
 		rm -rf /tmp/91yunserverspeeder.tar.gz
@@ -1564,7 +1598,7 @@ Install_LotServer(){
 	[[ ! -e "/tmp/appex.sh" ]] && echo -e "${Error} LotServer 安装脚本下载失败 !" && exit 1
 	bash /tmp/appex.sh 'install'
 	sleep 2s
-	PID=`ps -ef |grep -v grep |grep "appex" |awk '{print $2}'`
+	PID=$(ps -ef |grep -v grep |grep "appex" |awk '{print $2}')
 	if [[ ! -z ${PID} ]]; then
 		echo -e "${Info} LotServer 安装完成 !" && exit 1
 	else
@@ -1674,7 +1708,7 @@ UnBanBTPTSPAM(){
 Set_config_connect_verbose_info(){
 	SSR_installation_status
 	[[ ! -e ${jq_file} ]] && echo -e "${Error} JQ解析器 不存在，请检查 !" && exit 1
-	connect_verbose_info=`${jq_file} '.connect_verbose_info' ${config_user_file}`
+	connect_verbose_info=$(${jq_file} '.connect_verbose_info' ${config_user_file})
 	if [[ ${connect_verbose_info} = "0" ]]; then
 		echo && echo -e "当前日志模式: ${Green_font_prefix}简单模式（只输出错误日志）${Font_color_suffix}" && echo
 		echo -e "确定要切换为 ${Green_font_prefix}详细模式（输出详细连接日志+错误日志）${Font_color_suffix}？[y/N]"
